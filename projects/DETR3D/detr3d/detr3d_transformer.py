@@ -52,6 +52,8 @@ class Detr3DTransformer(BaseModule):
                  two_stage_num_proposals=300,
                  decoder=None,
                  **kwargs):
+        print("[Detr3DTransformer][__init__] start")
+
         super(Detr3DTransformer, self).__init__(**kwargs)
         self.decoder = build_transformer_layer_sequence(decoder)
         self.embed_dims = self.decoder.embed_dims
@@ -62,10 +64,14 @@ class Detr3DTransformer(BaseModule):
 
     def init_layers(self):
         """Initialize layers of the Detr3DTransformer."""
+        print("[Detr3DTransformer][init_layers] start")
+
         self.reference_points = nn.Linear(self.embed_dims, 3)
 
     def init_weights(self):
         """Initialize the transformer weights."""
+        print("[Detr3DTransformer][init_weights] start")
+
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -101,18 +107,39 @@ class Detr3DTransformer(BaseModule):
                     points in decoder, has shape
                     (num_dec_layers, bs, num_query, embed_dims)
         """
+        print("[Detr3DTransformer][forward] start")
+
         assert query_embed is not None
         bs = mlvl_feats[0].size(0)
+
+        print("[Detr3DTransformer][forward] shape of query_embed {}".format(query_embed.shape))
+        print("[Detr3DTransformer][forward] embed_dims {}".format(self.embed_dims))
+
         query_pos, query = torch.split(query_embed, self.embed_dims, dim=1)
+
+        print("[Detr3DTransformer][forward] shape of query_pos {}".format(query_pos.shape))
+        print("[Detr3DTransformer][forward] shape of query {}".format(query.shape))
+
         query_pos = query_pos.unsqueeze(0).expand(bs, -1, -1)  # [bs,num_q,c]
         query = query.unsqueeze(0).expand(bs, -1, -1)  # [bs,num_q,c]
+
+        print("[Detr3DTransformer][forward] shape of query {}".format(query.shape))
+        print("[Detr3DTransformer][forward] ready to {}".format(self.reference_points.__class__.__name__))
+
         reference_points = self.reference_points(query_pos)
+
+        print("[Detr3DTransformer][forward] shape of reference_points {}".format(reference_points.shape))
+
         reference_points = reference_points.sigmoid()
         init_reference_out = reference_points
 
         # decoder
         query = query.permute(1, 0, 2)
         query_pos = query_pos.permute(1, 0, 2)
+
+        print("[Detr3DTransformer][forward] shape of query_pos {}".format(query_pos.shape))
+        print("[Detr3DTransformer][forward] shape of query {}".format(query.shape))
+
         inter_states, inter_references = self.decoder(
             query=query,
             key=None,
@@ -123,6 +150,11 @@ class Detr3DTransformer(BaseModule):
             **kwargs)
 
         inter_references_out = inter_references
+
+        print("[Detr3DTransformer][forward] shape of inter_states: {}".format(inter_states.shape))
+        print("[Detr3DTransformer][forward] shape of init_reference_out: {}".format(init_reference_out.shape))
+        print("[Detr3DTransformer][forward] shape of inter_references_out: {}".format(inter_references_out.shape))
+
         return inter_states, init_reference_out, inter_references_out
 
 
@@ -137,6 +169,8 @@ class Detr3DTransformerDecoder(TransformerLayerSequence):
     """
 
     def __init__(self, *args, return_intermediate=False, **kwargs):
+        print("[Detr3DTransformerDecoder][__init__] start")
+
         super(Detr3DTransformerDecoder, self).__init__(*args, **kwargs)
         self.return_intermediate = return_intermediate
 
@@ -164,16 +198,26 @@ class Detr3DTransformerDecoder(TransformerLayerSequence):
                 return_intermediate is `False`, otherwise it has shape
                 [num_layers, num_query, bs, embed_dims].
         """
+        print("[Detr3DTransformerDecoder][forward] start")
+
         output = query
         intermediate = []
         intermediate_reference_points = []
+
+        print("[Detr3DTransformerDecoder][forward] shape of reference_points: {}".format(reference_points.shape))
+        print("[Detr3DTransformerDecoder][forward] reg_branches: {}".format(reg_branches))
+        print("[Detr3DTransformerDecoder][forward] {} layers".format(len(self.layers)))
+
         for lid, layer in enumerate(self.layers):  # iterative refinement
+            print("[Detr3DTransformerDecoder][forward] {}th {}".format(lid, layer.__class__.__name__))
+
             reference_points_input = reference_points
             output = layer(
                 output,
                 *args,
                 reference_points=reference_points_input,
                 **kwargs)
+
             output = output.permute(1, 0, 2)
             if reg_branches is not None:
                 tmp = reg_branches[lid](output)
@@ -198,6 +242,8 @@ class Detr3DTransformerDecoder(TransformerLayerSequence):
         if self.return_intermediate:
             return torch.stack(intermediate), torch.stack(
                 intermediate_reference_points)
+
+        print("[Detr3DTransformerDecoder][forward] end")
 
         return output, reference_points
 
@@ -236,6 +282,8 @@ class Detr3DCrossAtten(BaseModule):
         init_cfg=None,
         batch_first=False,
     ):
+        print("[Detr3DCrossAtten][__init__] start")
+
         super(Detr3DCrossAtten, self).__init__(init_cfg)
         if embed_dims % num_heads != 0:
             raise ValueError(f'embed_dims must be divisible by num_heads, '
@@ -268,6 +316,8 @@ class Detr3DCrossAtten(BaseModule):
         self.num_heads = num_heads
         self.num_points = num_points
         self.num_cams = num_cams
+
+        # input dim: 256, output dim: 6*4*4 = 96
         self.attention_weights = nn.Linear(embed_dims,
                                            num_cams * num_levels * num_points)
 
@@ -286,6 +336,8 @@ class Detr3DCrossAtten(BaseModule):
 
     def init_weight(self):
         """Default initialization for Parameters of Module."""
+        print("[Detr3DCrossAtten][init_weight] start")
+
         constant_init(self.attention_weights, val=0., bias=0.)
         xavier_init(self.output_proj, distribution='uniform', bias=0.)
 
@@ -316,9 +368,24 @@ class Detr3DCrossAtten(BaseModule):
         Returns:
              Tensor: forwarded results with shape [num_query, bs, embed_dims].
         """
+        print("[Detr3DCrossAtten][forward] start")
+
+        print("[Detr3DCrossAtten][forward] shape of query: {}".format(query.shape))
+        print("[Detr3DCrossAtten][forward] shape of key: {}".format(key.shape if key is not None else None))
+        print("[Detr3DCrossAtten][forward] size of value: {}".format(len(value)))
+        for ind,item in enumerate(value):
+            print("[Detr3DCrossAtten][forward] shape of value[{}]: {}".format(ind, item.shape))
+        print("[Detr3DCrossAtten][forward] shape of residual: {}".format(residual.shape if residual is not None else None))
+        print("[Detr3DCrossAtten][forward] shape of query_pos: {}".format(query_pos.shape if query_pos is not None else None))
+        print("[Detr3DCrossAtten][forward] shape of reference_points: {}".format(reference_points.shape if reference_points is not None else None))
+
         if key is None:
-            key = query
+            print("[Detr3DCrossAtten][forward] None key is assigned with query")
+            key = query # 浅拷贝
+            print("[Detr3DCrossAtten][forward] query addr in memory: {}".format(id(query)))
+            print("[Detr3DCrossAtten][forward] key addr in memory: {}".format(id(key)))
         if value is None:
+            print("[Detr3DCrossAtten][forward] None value is assigned with key")
             value = key
 
         if residual is None:
@@ -326,24 +393,49 @@ class Detr3DCrossAtten(BaseModule):
         if query_pos is not None:
             query = query + query_pos
 
-        query = query.permute(1, 0, 2)
+        print("[Detr3DCrossAtten][forward] shape of query: {}".format(query.shape))
+        print("[Detr3DCrossAtten][forward] shape of key: {}".format(key.shape if key is not None else None))
+
+        query = query.permute(1, 0, 2) # 深拷贝
+
+        print("[Detr3DCrossAtten][forward] query addr in memory: {}".format(id(query)))
+        print("[Detr3DCrossAtten][forward] key addr in memory: {}".format(id(key)))
+
+        print("[Detr3DCrossAtten][forward] shape of query: {}".format(query.shape))
+        print("[Detr3DCrossAtten][forward] shape of key: {}".format(key.shape if key is not None else None))
 
         bs, num_query, _ = query.size()
 
         attention_weights = self.attention_weights(query).view(
             bs, 1, num_query, self.num_cams, self.num_points, self.num_levels)
+
+        print("[Detr3DCrossAtten][forward] shape of attention_weights: {}".format(attention_weights.shape))
+        print("[Detr3DCrossAtten][forward] shape of query: {}".format(query.shape))
+        print("[Detr3DCrossAtten][forward] shape of key: {}".format(key.shape if key is not None else None))
+        print("[Detr3DCrossAtten][forward] shape of reference_points: {}".format(reference_points.shape))
+
         reference_points_3d, output, mask = feature_sampling(
             value, reference_points, self.pc_range, kwargs['img_metas'])
+
         output = torch.nan_to_num(output)
         mask = torch.nan_to_num(mask)
         attention_weights = attention_weights.sigmoid() * mask
         output = output * attention_weights
         output = output.sum(-1).sum(-1).sum(-1)
         output = output.permute(2, 0, 1)
+
         # (num_query, bs, embed_dims)
         output = self.output_proj(output)
         pos_feat = self.position_encoder(
             inverse_sigmoid(reference_points_3d)).permute(1, 0, 2)
+
+        print("[Detr3DCrossAtten][forward] shape of query: {}".format(query.shape))
+        print("[Detr3DCrossAtten][forward] shape of key: {}".format(key.shape if key is not None else None))
+        print("[Detr3DCrossAtten][forward] size of value: {}".format(len(value)))
+        for ind,item in enumerate(value):
+            print("[Detr3DCrossAtten][forward] shape of value[{}]: {}".format(ind, item.shape))
+        print("[Detr3DCrossAtten][forward] end")
+
         return self.dropout(output) + inp_residual + pos_feat
 
 
@@ -373,9 +465,15 @@ def feature_sampling(mlvl_feats,
                 has projected outsied of images, with shape \
                 (B 1 num_q N 1 1)
     """
+    print("[Detr3DCrossAtten][forward] size of img_metas: {}".format(len(img_metas)))
+    print("[Detr3DCrossAtten][forward] img_metas[0]: {}".format(img_metas[0]))
+
     lidar2img = [meta['lidar2img'] for meta in img_metas]
     lidar2img = np.asarray(lidar2img)
     lidar2img = ref_pt.new_tensor(lidar2img)
+
+    print("[Detr3DCrossAtten][forward] shape of lidar2img: {}".format(lidar2img.shape))
+
     ref_pt = ref_pt.clone()
     ref_pt_3d = ref_pt.clone()
 

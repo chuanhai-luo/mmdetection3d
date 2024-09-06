@@ -45,6 +45,8 @@ class DETR3DHead(DETRHead):
             code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2],
             code_size=10,
             **kwargs):
+        print("[DETR3DHead][__init__] start")
+
         self.with_box_refine = with_box_refine
         self.as_two_stage = as_two_stage
         if self.as_two_stage:
@@ -68,6 +70,8 @@ class DETR3DHead(DETRHead):
     # forward_train -> loss
     def _init_layers(self):
         """Initialize classification branch and regression branch of head."""
+        print("[DETR3DHead][_init_layers] start")
+
         cls_branch = []
         for _ in range(self.num_reg_fcs):
             cls_branch.append(Linear(self.embed_dims, self.embed_dims))
@@ -106,6 +110,8 @@ class DETR3DHead(DETRHead):
 
     def init_weights(self):
         """Initialize weights of the DeformDETR head."""
+        print("[DETR3DHead][init_weights] start")
+
         self.transformer.init_weights()
         if self.loss_cls.use_sigmoid:
             bias_init = bias_init_with_prob(0.01)
@@ -120,16 +126,32 @@ class DETR3DHead(DETRHead):
             mlvl_feats (List[Tensor]): Features from the upstream
                 network, each is a 5D-tensor with shape
                 (B, N, C, H, W).
+                B: batch_size
+                N: number of images
+                C: channels
+                H: height
+                W: width
         Returns:
             all_cls_scores (Tensor): Outputs from the classification head,
                 shape [nb_dec, bs, num_query, cls_out_channels]. Note
                 cls_out_channels should includes background.
+                nb_dec refers to the number of decoder layers.
             all_bbox_preds (Tensor): Sigmoid outputs from the regression
                 head with normalized coordinate format
                 (cx, cy, l, w, cz, h, sin(φ), cos(φ), vx, vy).
                 Shape [nb_dec, bs, num_query, 10].
         """
+        print("[DETR3DHead][forward] start")
+        # print("input of forward(): {}".format(mlvl_feats))
+        print("[DETR3DHead][forward] type of input of forward(): {}".format(type(mlvl_feats)))
+        print("[DETR3DHead][forward] size of input of forward(): {}".format(len(mlvl_feats)))
+        for ind,item in enumerate(mlvl_feats):
+            print("[DETR3DHead][forward] shape of input[{}] of forward(): {}".format(ind, item.shape))
+
         query_embeds = self.query_embedding.weight
+
+        print("[DETR3DHead][forward] shape of query_embeds: {}".format(query_embeds.shape))
+
         hs, init_reference, inter_references = self.transformer(
             mlvl_feats,
             query_embeds,
@@ -139,6 +161,8 @@ class DETR3DHead(DETRHead):
         hs = hs.permute(0, 2, 1, 3)
         outputs_classes = []
         outputs_coords = []
+
+        print("[DETR3DHead][forward] shape of hs: {}".format(hs.shape))
 
         for lvl in range(hs.shape[0]):
             if lvl == 0:
@@ -172,6 +196,13 @@ class DETR3DHead(DETRHead):
 
         outputs_classes = torch.stack(outputs_classes)
         outputs_coords = torch.stack(outputs_coords)
+
+        print("[DETR3DHead][forward] shape of outputs_classes: {}".format(outputs_classes.shape))
+        print("[DETR3DHead][forward] shape of outputs_coords: {}".format(outputs_coords.shape))
+
+        # print("outputs_classes: {}".format(outputs_classes))
+        # print("outputs_coords: {}".format(outputs_coords))
+
         outs = {
             'all_cls_scores': outputs_classes,
             'all_bbox_preds': outputs_coords,
@@ -186,6 +217,8 @@ class DETR3DHead(DETRHead):
             bbox_pred: Tensor,  # [query, 10]
             gt_instances_3d: InstanceList) -> Tuple[Tensor, ...]:
         """Compute regression and classification targets for a single image."""
+        print("[DETR3DHead][_get_target_single] start")
+
         # turn bottm center into gravity center
         gt_bboxes = gt_instances_3d.bboxes_3d  # [num_gt, 9]
         gt_bboxes = torch.cat(
@@ -257,6 +290,8 @@ class DETR3DHead(DETRHead):
                 - num_total_neg (int): Number of negative samples in all \
                     images.
         """
+        print("[DETR3DHead][get_targets] start")
+
         (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
          pos_inds_list, neg_inds_list) = multi_apply(self._get_target_single,
                                                      batch_cls_scores,
@@ -291,6 +326,8 @@ class DETR3DHead(DETRHead):
             tulple(Tensor, Tensor): cls and reg loss for outputs from
                 a single decoder layer.
         """
+        print("[DETR3DHead][loss_by_feat_single] start")
+
         batch_size = batch_cls_scores.size(0)  # batch size
         cls_scores_list = [batch_cls_scores[i] for i in range(batch_size)]
         bbox_preds_list = [batch_bbox_preds[i] for i in range(batch_size)]
@@ -360,6 +397,8 @@ class DETR3DHead(DETRHead):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
+        print("[DETR3DHead][loss_by_feat] start")
+
         assert batch_gt_instances_3d_ignore is None, \
             f'{self.__class__.__name__} only supports ' \
             f'for batch_gt_instances_3d_ignore setting to None.'
@@ -429,6 +468,8 @@ class DETR3DHead(DETRHead):
                 - bboxes_3d (Tensor): Contains a tensor with shape
                   (num_instances, C), where C >= 7.
         """
+        print("[DETR3DHead][predict_by_feat] start")
+
         # sinθ & cosθ ---> θ
         preds_dicts = self.bbox_coder.decode(preds_dicts)
         num_samples = len(preds_dicts)  # batch size

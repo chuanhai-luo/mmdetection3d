@@ -25,6 +25,7 @@ class NMSFreeCoder(BaseBBoxCoder):
                  max_num=100,
                  score_threshold=None,
                  num_classes=10):
+        print("[NMSFreeCoder][__init__] start")
 
         self.pc_range = pc_range
         self.voxel_size = voxel_size
@@ -50,6 +51,8 @@ class NMSFreeCoder(BaseBBoxCoder):
         Returns:
             list[dict]: Decoded boxes.
         """
+        print("[NMSFreeCoder][decode_single] start")
+
         max_num = self.max_num
 
         cls_scores = cls_scores.sigmoid()
@@ -106,6 +109,8 @@ class NMSFreeCoder(BaseBBoxCoder):
         Returns:
             list[dict]: Decoded boxes.
         """
+        print("[NMSFreeCoder][decode] start")
+
         # cls & reg target of last decoder layer
         all_cls_scores = preds_dicts['all_cls_scores'][-1]
         all_bbox_preds = preds_dicts['all_bbox_preds'][-1]

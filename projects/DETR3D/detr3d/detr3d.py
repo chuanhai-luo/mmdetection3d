@@ -81,12 +81,15 @@ class DETR3D(MVXTwoStageDetector):
                 img = img.view(B * N, C, H, W)
             if self.use_grid_mask:
                 img = self.grid_mask(img)  # mask out some grids
+
+            print("[DETR3D][extract_img_feat] ready to backbone {}".format(self.img_backbone.__class__.__name__))
             img_feats = self.img_backbone(img)
             if isinstance(img_feats, dict):
                 img_feats = list(img_feats.values())
         else:
             return None
         if self.with_img_neck:
+            print("[DETR3D][extract_img_feat] ready to neck {}".format(self.img_neck.__class__.__name__))
             img_feats = self.img_neck(img_feats)
 
         img_feats_reshaped = []
@@ -125,16 +128,31 @@ class DETR3D(MVXTwoStageDetector):
             dict[str, Tensor]: A dictionary of loss components.
 
         """
+        print("[DETR3D][loss] start")
+
         batch_input_metas = [item.metainfo for item in batch_data_samples]
         batch_input_metas = self.add_lidar2img(batch_input_metas)
         img_feats = self.extract_feat(batch_inputs_dict, batch_input_metas)
+
+        for idx, item in enumerate(img_feats):
+            print("[DETR3D][loss] img_feats[{}] has shape of {}".format(idx, item.shape))
+
+        print("[DETR3D][loss] ready to head {}".format(self.pts_bbox_head.__class__.__name__))
         outs = self.pts_bbox_head(img_feats, batch_input_metas, **kwargs)
+
+        for key,value in outs.items():
+            if value is not None:
+                print("[DETR3D][loss] outs[\"{}\"] has {} items with shape of {}".format(key, len(value), value[0].shape))
+            else:
+                print("[DETR3D][loss] outs[\"{}\"] is None".format(key))
 
         batch_gt_instances_3d = [
             item.gt_instances_3d for item in batch_data_samples
         ]
         loss_inputs = [batch_gt_instances_3d, outs]
         losses_pts = self.pts_bbox_head.loss_by_feat(*loss_inputs)
+
+        print("[DETR3D][loss] end")
 
         return losses_pts
 

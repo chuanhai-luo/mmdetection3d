@@ -42,7 +42,7 @@ We require the version of mmdet \<= V3.0.0rc5. The mmdet later than V3.0.0rc5 ha
 2. For example, to train DETR3D on 8 GPUs, please use
 
 ```bash
-bash tools/dist_train.sh projects/DETR3D/configs/detr3d_res101_gridmask.py 8 --cfg-options load_from=pretrained/fcos3d.pth
+bash tools/dist_train.sh projects/DETR3D/configs/detr3d_r101_gridmask.py 1 --cfg-options load_from=pretrained/fcos3d.pth
 ```
 
 ## Evaluation using pretrained models
@@ -60,7 +60,7 @@ bash tools/dist_train.sh projects/DETR3D/configs/detr3d_res101_gridmask.py 8 --c
    To test, use:
 
    ```bash
-    bash tools/dist_test.sh projects/DETR3D/configs/detr3d_res101_gridmask.py ${CHECKPOINT_PATH} 8
+    bash tools/dist_test.sh projects/DETR3D/configs/detr3d_r101_gridmask.py pretrained/detr3d_r101_gridmask.pth 1
    ```
 
 ## Converting old models (Optional)

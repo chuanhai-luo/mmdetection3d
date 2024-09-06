@@ -35,7 +35,7 @@ model = dict(
         depth=101,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
+        frozen_stages=4,
         norm_cfg=dict(type='BN2d', requires_grad=False),
         norm_eval=True,
         style='caffe',
@@ -168,7 +168,7 @@ data_prefix = dict(
 
 train_dataloader = dict(
     batch_size=1,
-    num_workers=4,
+    num_workers=1,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -189,7 +189,7 @@ train_dataloader = dict(
 
 val_dataloader = dict(
     batch_size=1,
-    num_workers=4,
+    num_workers=1,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False),
@@ -240,7 +240,7 @@ param_scheduler = [
         eta_min_ratio=1e-3)
 ]
 
-total_epochs = 24
+total_epochs = 1
 
 train_cfg = dict(
     type='EpochBasedTrainLoop', max_epochs=total_epochs, val_interval=2)

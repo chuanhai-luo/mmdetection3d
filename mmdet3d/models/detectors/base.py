@@ -71,6 +71,8 @@ class Base3DDetector(BaseDetector):
             - If ``mode="predict"``, return a list of :obj:`Det3DDataSample`.
             - If ``mode="loss"``, return a dict of tensor.
         """
+        print("[Base3DDetector][forward] in {} mode".format(mode))
+
         if mode == 'loss':
             return self.loss(inputs, data_samples, **kwargs)
         elif mode == 'predict':
